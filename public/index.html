@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ConstructDocs — QS Estimate Generator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f4f8; color: #1a202c; min-height: 100vh; }
+    header { background: #1F3864; color: white; padding: 18px 40px; display: flex; align-items: center; justify-content: space-between; }
+    header h1 { font-size: 20px; font-weight: 700; }
+    header p  { font-size: 12px; opacity: 0.7; margin-top: 2px; }
+    .steps { display: flex; align-items: center; gap: 8px; color: white; }
+    .step-dot { width: 28px; height: 28px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.4); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.6); transition: all 0.3s; }
+    .step-dot.active { border-color: white; color: white; background: rgba(255,255,255,0.2); }
+    .step-dot.done   { border-color: #48bb78; color: #48bb78; }
+    .step-label { font-size: 11px; opacity: 0.7; }
+    .step-divider { width: 28px; height: 1px; background: rgba(255,255,255,0.3); }
+    main { max-width: 860px; margin: 32px auto; padding: 0 20px; }
+    .card { background: white; border-radius: 12px; padding: 26px 30px; box-shadow: 0 2px 12px rgba(0,0,0,0.07); margin-bottom: 18px; }
+    .card h2 { font-size: 15px; font-weight: 700; color: #1F3864; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 2px solid #e2e8f0; }
+    .card h3 { font-size: 12px; font-weight: 700; color: #718096; margin: 18px 0 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .grid  { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
+    .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 13px; }
+    .grid4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 13px; }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field.full { grid-column: 1 / -1; }
+    label { font-size: 12px; font-weight: 600; color: #4a5568; display: flex; align-items: center; gap: 6px; }
+    .badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 10px; font-weight: 700; }
+    .bf { background: #c6f6d5; color: #276749; }
+    .bm { background: #fefcbf; color: #744210; }
+    .bq { background: #e9d8fd; color: #553c9a; }
+    input, select, textarea { padding: 9px 12px; border: 1.5px solid #e2e8f0; border-radius: 7px; font-size: 13px; color: #1a202c; background: white; transition: border-color 0.2s; width: 100%; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: #1F3864; }
+    input.ok  { border-color: #48bb78; background: #f0fff4; }
+    input.gap { border-color: #ed8936; background: #fffaf0; }
+    .upload-zone { border: 2px dashed #cbd5e0; border-radius: 10px; padding: 28px; text-align: center; cursor: pointer; transition: all 0.2s; background: #f7fafc; }
+    .upload-zone:hover   { border-color: #1F3864; background: #ebf4ff; }
+    .upload-zone.has-file{ border-color: #48bb78; background: #f0fff4; }
+    .upload-zone input   { display: none; }
+    .upload-zone p       { font-size: 13px; color: #718096; margin-top: 7px; }
+    .upload-zone strong  { color: #1F3864; }
+    .file-name { color: #48bb78; font-weight: 600; margin-top: 5px; font-size: 12px; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 22px; border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s; width: 100%; }
+    .btn-blue  { background: #1F3864; color: white; }
+    .btn-blue:hover   { background: #2a4a80; }
+    .btn-blue:disabled{ background: #a0aec0; cursor: not-allowed; }
+    .btn-green { background: #38a169; color: white; }
+    .btn-green:hover   { background: #2f855a; }
+    .btn-green:disabled{ background: #a0aec0; cursor: not-allowed; }
+    .btn-gray  { background: #e2e8f0; color: #4a5568; width: auto; }
+    .btn-gray:hover { background: #cbd5e0; }
+    .status { padding: 13px 16px; border-radius: 8px; font-size: 13px; margin-top: 12px; display: none; }
+    .st-load{ display: flex !important; align-items: flex-start; gap: 11px; background: #ebf8ff; color: #2b6cb0; border: 1px solid #bee3f8; }
+    .st-err { display: block !important; background: #fff5f5; color: #c53030; border: 1px solid #fed7d7; }
+    .st-ok  { display: block !important; background: #f0fff4; color: #276749; border: 1px solid #c6f6d5; }
+    .spinner { width: 17px; height: 17px; flex-shrink: 0; margin-top: 1px; border: 2.5px solid #bee3f8; border-top-color: #2b6cb0; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .banner { padding: 11px 15px; border-radius: 8px; font-size: 12px; display: flex; align-items: flex-start; gap: 9px; margin-bottom: 14px; line-height: 1.5; }
+    .bn-green { background: #f0fff4; color: #276749; border: 1px solid #c6f6d5; }
+    .bn-yellow{ background: #fffff0; color: #744210; border: 1px solid #faf089; }
+    .bn-blue  { background: #ebf8ff; color: #2b6cb0; border: 1px solid #bee3f8; }
+    .divider  { height: 1px; background: #e2e8f0; margin: 18px 0; }
+    .note { font-size: 11px; color: #718096; margin-top: 3px; line-height: 1.5; }
+    #screen2 { display: none; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div><h1>ConstructDocs</h1><p>AI-Powered QS Preliminary Cost Estimate</p></div>
+  <div class="steps">
+    <div class="step-dot active" id="dot1">1</div>
+    <div class="step-label">Project & Drawing</div>
+    <div class="step-divider"></div>
+    <div class="step-dot" id="dot2">2</div>
+    <div class="step-label">Review & Confirm</div>
+    <div class="step-divider"></div>
+    <div class="step-dot" id="dot3">3</div>
+    <div class="step-label">BOQ Generated</div>
+  </div>
+</header>
+
+<main>
+
+<!-- ═══════════════════════════ SCREEN 1 ═══════════════════════════ -->
+<div id="screen1">
+
+  <div class="card">
+    <h2>📋 Project Information</h2>
+    <div class="grid">
+      <div class="field"><label>Project Name *</label><input id="s1_projectName" placeholder="e.g. Lotus Astec Factory"></div>
+      <div class="field"><label>Client Name *</label><input id="s1_clientName" placeholder="e.g. Nissho Astec Co., Ltd"></div>
+      <div class="field full"><label>Location</label><input id="s1_location" placeholder="e.g. Tan Duc IP, Lam Dong Province, Vietnam"></div>
+      <div class="field"><label>Prepared By</label><input id="s1_createdBy" placeholder="e.g. QS Team"></div>
+      <div class="field"><label>Building Type</label>
+        <select id="s1_buildingType">
+          <option>Factory / Industrial Warehouse</option>
+          <option>Office Building</option>
+          <option>Mixed Use (Factory + Office)</option>
+          <option>Warehouse / Logistics</option>
+          <option>Renovation / Fit-out</option>
+        </select>
+      </div>
+      <div class="field"><label>Specification Level</label>
+        <select id="s1_specLevel">
+          <option>Standard</option><option>Premium</option><option>Economy</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>📄 Upload Architectural Drawing</h2>
+    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('drawingFile').click()">
+      <input type="file" id="drawingFile" accept=".pdf,image/*">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#1F3864" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <p><strong>Click to upload</strong> or drag & drop</p>
+      <p>PDF or image — concept drawing, tender drawing, max 50MB</p>
+      <div class="file-name" id="fileName"></div>
+    </div>
+    <p class="note" style="margin-top:10px">The AI will read the drawing and extract dimensions, roof specs, wall specs, crane info, and building areas. You will review everything before the BOQ is generated. You can also proceed without a drawing — the estimate will be based on your inputs only.</p>
+  </div>
+
+  <div id="st1" class="status"></div>
+
+  <button class="btn btn-blue" id="extractBtn" onclick="startExtraction()">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    Analyse Drawing & Continue
+  </button>
+
+</div>
+
+
+<!-- ═══════════════════════════ SCREEN 2 ═══════════════════════════ -->
+<div id="screen2">
+
+  <div style="margin-bottom:14px">
+    <button class="btn btn-gray" onclick="goBack()">← Back</button>
+  </div>
+
+  <!-- A. From drawing -->
+  <div class="card">
+    <h2>🔍 Extracted from Drawing — Review & Correct</h2>
+    <div class="banner bn-green"><span>✓</span><span>The AI has read your drawing. Green fields were confirmed. Yellow fields were not found — please fill them in or leave blank to use a QS allowance.</span></div>
+
+    <h3>Project & Location</h3>
+    <div class="grid">
+      <div class="field"><label>Project Name <span class="badge bf" id="b_pname"></span></label><input id="r_pname"></div>
+      <div class="field"><label>Client Name <span class="badge bf" id="b_cname"></span></label><input id="r_cname"></div>
+      <div class="field full"><label>Location <span class="badge bf" id="b_loc"></span></label><input id="r_loc"></div>
+    </div>
+
+    <div class="divider"></div>
+    <h3>Building Areas & Height</h3>
+    <div class="grid">
+      <div class="field"><label>Factory Footprint (m²) <span class="badge" id="b_fp"></span></label><input type="number" id="r_fp" placeholder="e.g. 8498"><p class="note">Main factory floor area only</p></div>
+      <div class="field"><label>Total All Buildings (m²) <span class="badge" id="b_ta"></span></label><input type="number" id="r_ta" placeholder="e.g. 9102"></div>
+      <div class="field"><label>Floor Description <span class="badge" id="b_fl"></span></label><input id="r_fl" placeholder="e.g. 1F factory + 2F office"></div>
+      <div class="field"><label>Clear / Eave Height (m) <span class="badge" id="b_ht"></span></label><input type="number" id="r_ht" placeholder="e.g. 10"></div>
+    </div>
+
+    <div class="divider"></div>
+    <h3>Roof</h3>
+    <div class="grid">
+      <div class="field"><label>Roof Slope <span class="badge" id="b_rs"></span></label><input id="r_rs" placeholder="e.g. i=10%"></div>
+      <div class="field"><label>Roof Sheet Spec <span class="badge" id="b_rsh"></span></label><input id="r_rsh" placeholder="e.g. Galvanized profile metal sheet"></div>
+      <div class="field full"><label>Insulation Spec <span class="badge" id="b_ins"></span></label><input id="r_ins" placeholder="e.g. Glasswool t=50mm, aluminium face, galvanized wire mesh"></div>
+    </div>
+
+    <div class="divider"></div>
+    <h3>Walls & Structure</h3>
+    <div class="grid">
+      <div class="field full"><label>Wall Cladding Spec <span class="badge" id="b_wall"></span></label><input id="r_wall" placeholder="e.g. Brick 1m height + Metal sheet to eave"></div>
+      <div class="field full"><label>Structural System <span class="badge" id="b_str"></span></label><input id="r_str" placeholder="e.g. Steel portal frame with RC foundations"></div>
+    </div>
+
+    <div class="divider"></div>
+    <h3>Cranes & Equipment</h3>
+    <div class="field full"><label>Crane Information <span class="badge" id="b_cr"></span></label>
+      <textarea id="r_cr" rows="2" placeholder="e.g. Single girder 1.5T ×3 bays (hoist 6m), Double girder 5T ×1 bay (hoist 10m)"></textarea>
+    </div>
+  </div>
+
+  <!-- B. QS inputs -->
+  <div class="card">
+    <h2>✏️ QS Input — Not Found in Drawing</h2>
+    <div class="banner bn-yellow"><span>⚠</span><span>These were not found in the drawing. Fill them in or leave as Unknown to use a QS allowance.</span></div>
+    <div class="grid">
+      <div class="field"><label>Foundation Type <span class="badge bq">QS input</span></label>
+        <select id="r_found">
+          <option value="">Unknown — use QS allowance</option>
+          <option value="Bored pile D300-D400">Bored pile D300–D400</option>
+          <option value="Driven precast pile">Driven precast pile</option>
+          <option value="Spread footing / pad footing">Spread footing</option>
+          <option value="Raft foundation">Raft foundation</option>
+        </select>
+      </div>
+      <div class="field"><label>MEP Scope <span class="badge bq">QS input</span></label>
+        <select id="r_mep">
+          <option value="Civil only — MEP by others">Civil only — MEP by others</option>
+          <option value="Civil + MEP allowance included">Civil + MEP allowance</option>
+          <option value="Full turnkey including MEP">Full turnkey incl. MEP</option>
+        </select>
+      </div>
+      <div class="field"><label>Crane Required? <span class="badge bq">QS input</span></label>
+        <select id="r_crReq">
+          <option value="Unknown — extract from drawing">Unknown — from drawing</option>
+          <option value="Yes — overhead bridge crane">Yes — overhead bridge crane</option>
+          <option value="No crane">No crane</option>
+          <option value="Yes — gantry crane">Yes — gantry crane</option>
+        </select>
+      </div>
+      <div class="field"><label>Site Condition <span class="badge bq">QS input</span></label>
+        <select id="r_site">
+          <option value="Flat — already levelled in industrial park">Flat — levelled (IP)</option>
+          <option value="Requires earthworks and levelling">Requires earthworks</option>
+          <option value="Unknown">Unknown</option>
+        </select>
+      </div>
+      <div class="field full"><label>Additional Notes for AI</label>
+        <textarea id="r_notes" rows="2" placeholder="e.g. Fire wall REI150 between factory and office. Clean room 500m² in polishing zone. No suspended ceiling in production area."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- C. Steel benchmarks -->
+  <div class="card">
+    <h2>🏗️ Steel Structure Benchmarks</h2>
+    <div class="banner bn-blue"><span>ℹ</span><span>These affect steel tonnage calculations. Adjust based on span, height, and crane loading.</span></div>
+    <div class="grid3">
+      <div class="field"><label>Steel Rafter (kg/m²) <span class="badge bq">QS</span></label><input type="number" id="r_raf" value="55" min="20" max="150"><p class="note">Typical 45–80. Higher for long span or crane.</p></div>
+      <div class="field"><label>Purlin / Girt (kg/m²) <span class="badge bq">QS</span></label><input type="number" id="r_pur" value="18" min="5" max="60"><p class="note">Typical 15–25 kg/m².</p></div>
+      <div class="field"><label>Rebar Foundation (kg/m²) <span class="badge bq">QS</span></label><input type="number" id="r_reb" value="60" min="20" max="200"><p class="note">Typical 50–80 for industrial.</p></div>
+    </div>
+  </div>
+
+  <!-- D. Waste -->
+  <div class="card">
+    <h2>♻️ Waste & Deduction Rules</h2>
+    <div class="grid4">
+      <div class="field"><label>Roof Sheet Waste (%)</label><input type="number" id="r_rw" value="10" min="0" max="20"></div>
+      <div class="field"><label>Wall Cladding Waste (%)</label><input type="number" id="r_cw" value="10" min="0" max="20"></div>
+      <div class="field"><label>Tile / Finish Waste (%)</label><input type="number" id="r_fw" value="10" min="0" max="30"></div>
+      <div class="field"><label>Min. Opening to Deduct (m²)</label><input type="number" id="r_op" value="1.0" min="0" max="10" step="0.5"><p class="note">Deduct openings larger than this from wall area.</p></div>
+    </div>
+  </div>
+
+  <!-- E. Markup -->
+  <div class="card">
+    <h2>💰 Indirect Costs & Markup</h2>
+    <div class="grid4">
+      <div class="field"><label>Preliminaries (%)</label><input type="number" id="r_pre" value="10" min="0" max="30" step="0.5"></div>
+      <div class="field"><label>Contingency (%)</label><input type="number" id="r_con" value="15" min="0" max="50" step="0.5"></div>
+      <div class="field"><label>Profit / Markup (%)</label><input type="number" id="r_pro" value="8" min="0" max="30" step="0.5"></div>
+      <div class="field"><label>VAT (%)</label><input type="number" id="r_vat" value="10" min="0" max="15" step="0.5"></div>
+    </div>
+  </div>
+
+  <div id="st2" class="status"></div>
+
+  <button class="btn btn-green" id="genBtn" onclick="generateBOQ()">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+    Generate QS Estimate (Excel)
+  </button>
+
+</div>
+
+</main>
+<script>
+let drawingBase64 = null, drawingMimeType = null;
+
+// File upload
+const fileInput  = document.getElementById('drawingFile');
+const uploadZone = document.getElementById('uploadZone');
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) readFile(fileInput.files[0]); });
+uploadZone.addEventListener('dragover',  e => { e.preventDefault(); uploadZone.classList.add('has-file'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('has-file'));
+uploadZone.addEventListener('drop', e => { e.preventDefault(); if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]); });
+function readFile(file) {
+  drawingMimeType = file.type || 'application/pdf';
+  document.getElementById('fileName').textContent = `✓ ${file.name} (${(file.size/1024/1024).toFixed(1)}MB)`;
+  uploadZone.classList.add('has-file');
+  const r = new FileReader();
+  r.onload = e => { drawingBase64 = e.target.result.split(',')[1]; };
+  r.readAsDataURL(file);
+}
+
+// Step 1 → extract
+async function startExtraction() {
+  const pn = document.getElementById('s1_projectName').value.trim();
+  const cn = document.getElementById('s1_clientName').value.trim();
+  if (!pn || !cn) { showSt('st1','err','✗ Please fill in Project Name and Client Name.'); return; }
+  const btn = document.getElementById('extractBtn');
+  btn.disabled = true;
+  showSt('st1','load', drawingBase64
+    ? 'Reading drawing with AI — about 20–30 seconds...'
+    : 'No drawing uploaded — skipping extraction, loading input form...');
+  try {
+    const payload = { projectName:pn, clientName:cn,
+      location: document.getElementById('s1_location').value,
+      buildingType: document.getElementById('s1_buildingType').value,
+      specLevel: document.getElementById('s1_specLevel').value,
+      createdBy: document.getElementById('s1_createdBy').value,
+      drawingBase64: drawingBase64||'', drawingMimeType: drawingMimeType||'' };
+    const res  = await fetch('/api/qs/extract', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Extraction failed');
+    hideSt('st1');
+    populate(data.facts || {}, payload);
+    goScreen2();
+  } catch(e) {
+    btn.disabled = false;
+    showSt('st1','err','✗ '+(e.message||'Failed. Please try again.'));
+  }
+}
+
+// Populate review screen
+function populate(f, base) {
+  function set(inId, badgeId, val) {
+    const el = document.getElementById(inId);
+    const bd = document.getElementById(badgeId);
+    const ok = val && val !== 'NOT SHOWN' && String(val).trim() !== '' && Number(val) !== 0;
+    if (el) { el.value = ok ? val : ''; el.className = ok ? 'ok' : 'gap'; }
+    if (bd) { bd.textContent = ok ? 'found' : 'not found'; bd.className = ok ? 'badge bf' : 'badge bm'; }
+  }
+  function num(str) { if(!str) return 0; const m=String(str).match(/(\d[\d,]*\.?\d*)/); return m?parseFloat(m[1].replace(/,/g,'')):0; }
+
+  set('r_pname','b_pname', f.projectNameFromDrawing || base.projectName);
+  set('r_cname','b_cname', f.clientFromDrawing      || base.clientName);
+  set('r_loc',  'b_loc',   f.locationFromDrawing    || base.location);
+  set('r_fp',   'b_fp',    num(f.buildingFootprintFromDrawing));
+  set('r_ta',   'b_ta',    num(f.totalFloorAreaFromDrawing));
+  set('r_fl',   'b_fl',    f.numberOfFloorsFromDrawing);
+  set('r_ht',   'b_ht',    num(f.clearHeightFromDrawing||''));
+  set('r_rs',   'b_rs',    f.roofSlope);
+  set('r_rsh',  'b_rsh',   f.roofSheetSpec);
+  set('r_ins',  'b_ins',   f.roofInsulationSpec);
+  set('r_wall', 'b_wall',  f.wallCladdingSpec);
+  set('r_str',  'b_str',   f.structuralSystem);
+
+  // Cranes
+  const cranes = [...(f.confirmedItems||[]),...(f.boqCandidateItems||[])]
+    .filter(x=>{ const t=(Array.isArray(x)?x.join(' '):String(x)).toLowerCase(); return t.includes('crane')||t.includes('cẩu'); })
+    .map(x=>String(Array.isArray(x)?x.join(' '):x).substring(0,150));
+  const crTxt = cranes.join('\n');
+  const crEl = document.getElementById('r_cr');
+  crEl.value = crTxt;
+  const crBd = document.getElementById('b_cr');
+  if (crTxt) { crEl.className='ok'; crBd.textContent='found'; crBd.className='badge bf'; document.getElementById('r_crReq').value='Yes — overhead bridge crane'; }
+  else        { crEl.className='gap'; crBd.textContent='not found'; crBd.className='badge bm'; }
+}
+
+// Step 2 → generate
+async function generateBOQ() {
+  const btn = document.getElementById('genBtn');
+  btn.disabled = true;
+  showSt('st2','load','Generating BOQ — Parts A and B running in parallel. Usually 60–90 seconds...');
+  try {
+    const g = id => document.getElementById(id);
+    const payload = {
+      projectName: g('r_pname').value, clientName: g('r_cname').value,
+      location: g('r_loc').value,
+      buildingType: g('s1_buildingType').value, specLevel: g('s1_specLevel').value,
+      createdBy: g('s1_createdBy').value,
+      factoryFootprint:    parseFloat(g('r_fp').value)||0,
+      totalArea:           parseFloat(g('r_ta').value)||0,
+      numFloors:           g('r_fl').value,
+      clearHeight:         parseFloat(g('r_ht').value)||0,
+      roofSlope:           g('r_rs').value,
+      roofSheetSpec:       g('r_rsh').value,
+      roofInsulationSpec:  g('r_ins').value,
+      wallCladdingSpec:    g('r_wall').value,
+      structuralSystem:    g('r_str').value,
+      craneInfo:           g('r_cr').value,
+      foundationType:      g('r_found').value,
+      mepScope:            g('r_mep').value,
+      craneRequired:       g('r_crReq').value,
+      siteCondition:       g('r_site').value,
+      additionalNotes:     g('r_notes').value,
+      steelRafterKgm2:     parseFloat(g('r_raf').value)||55,
+      steelPurlinKgm2:     parseFloat(g('r_pur').value)||18,
+      rebarFoundationKgm2: parseFloat(g('r_reb').value)||60,
+      roofWastePct:        parseFloat(g('r_rw').value)||10,
+      claddingWastePct:    parseFloat(g('r_cw').value)||10,
+      finishWastePct:      parseFloat(g('r_fw').value)||10,
+      minOpeningDeductM2:  parseFloat(g('r_op').value)||1.0,
+      prelimPct:           parseFloat(g('r_pre').value)||10,
+      contingencyPct:      parseFloat(g('r_con').value)||15,
+      profitPct:           parseFloat(g('r_pro').value)||8,
+      vatPct:              parseFloat(g('r_vat').value)||10,
+      drawingBase64:       drawingBase64||'',
+      drawingMimeType:     drawingMimeType||''
+    };
+    const res = await fetch('/api/qs/generate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    if (!res.ok) { const e=await res.json(); throw new Error(e.error||`Error ${res.status}`); }
+    const blob = await res.blob();
+    const cd   = res.headers.get('Content-Disposition')||'';
+    const fm   = cd.match(/filename="([^"]+)"/);
+    const fn   = fm ? fm[1] : 'QS_Estimate.xlsx';
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a'); a.href=url; a.download=fn; a.click(); URL.revokeObjectURL(url);
+    document.getElementById('dot3').classList.add('done');
+    showSt('st2','ok',`✓ Done! File "${fn}" downloaded. Open it to see the full 8-tab BOQ.`);
+  } catch(e) {
+    showSt('st2','err','✗ '+(e.message||'Generation failed. Please try again.'));
+  } finally { btn.disabled = false; }
+}
+
+function goScreen2() {
+  document.getElementById('screen1').style.display='none';
+  document.getElementById('screen2').style.display='block';
+  document.getElementById('dot1').classList.replace('active','done');
+  document.getElementById('dot2').classList.add('active');
+  window.scrollTo(0,0);
+}
+function goBack() {
+  document.getElementById('screen2').style.display='none';
+  document.getElementById('screen1').style.display='block';
+  document.getElementById('dot2').classList.remove('active');
+  document.getElementById('dot1').classList.replace('done','active');
+  document.getElementById('extractBtn').disabled=false;
+  window.scrollTo(0,0);
+}
+function showSt(id, type, msg) {
+  const el=document.getElementById(id);
+  el.className='status '+(type==='load'?'st-load':type==='err'?'st-err':'st-ok');
+  el.style.display=type==='load'?'flex':'block';
+  el.innerHTML=type==='load'?`<div class="spinner"></div><div>${msg}</div>`:msg;
+}
+function hideSt(id) { document.getElementById(id).style.display='none'; }
+</script>
+</body>
+</html>

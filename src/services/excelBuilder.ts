@@ -70,7 +70,7 @@ export async function buildExcelBuffer(
   ]);
 
   const buffer = await wb.xlsx.writeBuffer();
-  return buffer as Buffer;
+  return Buffer.from(buffer as ArrayBuffer);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

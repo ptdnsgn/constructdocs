@@ -213,10 +213,10 @@
   <div class="card">
     <h2>📄 Upload Architectural Drawing</h2>
     <div class="upload-zone" id="uploadZone" onclick="document.getElementById('drawingFile').click()">
-      <input type="file" id="drawingFile" accept=".pdf,image/*">
+      <input type="file" id="drawingFile" accept="image/*" multiple>
       <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#1F3864" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
       <p><strong>Click to upload</strong> or drag & drop</p>
-      <p>PDF or image — concept drawing, tender drawing, max 50MB</p>
+      <p>Upload 1–5 screenshots of the drawing (PNG, JPG). Recommended: area schedule, roof plan, wall section.</p>
       <div class="file-name" id="fileName"></div>
     </div>
     <p class="note" style="margin-top:10px">The AI will read the drawing and extract dimensions, roof specs, wall specs, crane info, and building areas. You will review everything before the BOQ is generated. You can also proceed without a drawing — the estimate will be based on your inputs only.</p>
@@ -368,22 +368,49 @@
 
 </main>
 <script>
-let drawingBase64 = null, drawingMimeType = null;
+let drawings = []; // [{base64, mimeType, name}]
 
 // File upload
 const fileInput  = document.getElementById('drawingFile');
 const uploadZone = document.getElementById('uploadZone');
-fileInput.addEventListener('change', () => { if (fileInput.files[0]) readFile(fileInput.files[0]); });
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files.length > 0) readFiles(Array.from(fileInput.files));
+});
 uploadZone.addEventListener('dragover',  e => { e.preventDefault(); uploadZone.classList.add('has-file'); });
-uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('has-file'));
-uploadZone.addEventListener('drop', e => { e.preventDefault(); if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]); });
-function readFile(file) {
-  drawingMimeType = file.type || 'application/pdf';
-  document.getElementById('fileName').textContent = `✓ ${file.name} (${(file.size/1024/1024).toFixed(1)}MB)`;
-  uploadZone.classList.add('has-file');
-  const r = new FileReader();
-  r.onload = e => { drawingBase64 = e.target.result.split(',')[1]; };
-  r.readAsDataURL(file);
+uploadZone.addEventListener('dragleave', () => { if (drawings.length === 0) uploadZone.classList.remove('has-file'); });
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  if (e.dataTransfer.files.length > 0) readFiles(Array.from(e.dataTransfer.files));
+});
+
+function readFiles(files) {
+  drawings = [];
+  document.getElementById('fileName').textContent = '';
+  uploadZone.classList.remove('has-file');
+
+  const toRead = Array.from(files);
+  let done = 0;
+
+  toRead.forEach((file, i) => {
+    const r = new FileReader();
+    r.onload = e => {
+      drawings[i] = {
+        base64: e.target.result.split(',')[1],
+        mimeType: file.type || 'image/png',
+        name: file.name
+      };
+      done++;
+      if (done === toRead.length) {
+        // All files read
+        uploadZone.classList.add('has-file');
+        const names = drawings.map((d, idx) => `✓ ${idx+1}. ${d.name}`).join('\n');
+        document.getElementById('fileName').textContent = names;
+        document.getElementById('fileName').style.whiteSpace = 'pre-line';
+      }
+    };
+    r.readAsDataURL(file);
+  });
 }
 
 // Step 1 → extract
@@ -393,16 +420,18 @@ async function startExtraction() {
   if (!pn || !cn) { showSt('st1','err','✗ Please fill in Project Name and Client Name.'); return; }
   const btn = document.getElementById('extractBtn');
   btn.disabled = true;
-  showSt('st1','load', drawingBase64
-    ? 'Reading drawing with AI — about 20–30 seconds...'
-    : 'No drawing uploaded — skipping extraction, loading input form...');
+  showSt('st1','load', drawings.length > 0
+    ? `Reading ${drawings.length} screenshot(s) with AI — about 20–30 seconds...`
+    : 'No screenshots uploaded — skipping extraction, loading input form...');
   try {
-    const payload = { projectName:pn, clientName:cn,
-      location: document.getElementById('s1_location').value,
+    const payload = {
+      projectName: pn, clientName: cn,
+      location:     document.getElementById('s1_location').value,
       buildingType: document.getElementById('s1_buildingType').value,
-      specLevel: document.getElementById('s1_specLevel').value,
-      createdBy: document.getElementById('s1_createdBy').value,
-      drawingBase64: drawingBase64||'', drawingMimeType: drawingMimeType||'' };
+      specLevel:    document.getElementById('s1_specLevel').value,
+      createdBy:    document.getElementById('s1_createdBy').value,
+      drawings: drawings.map(d => ({ base64: d.base64, mimeType: d.mimeType }))
+    };
     const res  = await fetch('/api/qs/extract', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Extraction failed');
@@ -489,8 +518,7 @@ async function generateBOQ() {
       contingencyPct:      parseFloat(g('r_con').value)||15,
       profitPct:           parseFloat(g('r_pro').value)||8,
       vatPct:              parseFloat(g('r_vat').value)||10,
-      drawingBase64:       drawingBase64||'',
-      drawingMimeType:     drawingMimeType||''
+      drawings:            drawings.map(d => ({ base64: d.base64, mimeType: d.mimeType })),
     };
     const res = await fetch('/api/qs/generate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
     if (!res.ok) { const e=await res.json(); throw new Error(e.error||`Error ${res.status}`); }

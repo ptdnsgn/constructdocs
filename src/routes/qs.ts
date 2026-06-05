@@ -2,7 +2,7 @@
 
 import { Router, Request, Response } from 'express';
 import { generateQS } from '../services/qsHandler.js';
-import { extractDrawingFacts } from '../services/qsExtraction.js';
+import { extractDrawingFacts, extractDrawingFactsMulti } from '../services/qsExtraction.js';
 import { FormData } from '../types/index.js';
 
 const router = Router();
@@ -26,9 +26,16 @@ router.post('/extract', async (req: Request, res: Response) => {
 
     const drawingBase64   = String(body.drawingBase64   || '');
     const drawingMimeType = String(body.drawingMimeType || '');
+    const drawings: { base64: string; mimeType: string }[] = Array.isArray(body.drawings)
+      ? body.drawings.filter((d: { base64?: string; mimeType?: string }) => d.base64 && d.mimeType)
+      : [];
 
     let facts = {};
-    if (drawingBase64 && drawingMimeType) {
+    if (drawings.length > 0) {
+      // Multiple screenshots path
+      facts = await extractDrawingFactsMulti(formData, drawings);
+    } else if (drawingBase64 && drawingMimeType) {
+      // Single file fallback (backward compat)
       facts = await extractDrawingFacts(formData, drawingBase64, drawingMimeType);
     }
 
@@ -99,8 +106,15 @@ router.post('/generate', async (req: Request, res: Response) => {
 
     const drawingBase64   = String(body.drawingBase64   || '');
     const drawingMimeType = String(body.drawingMimeType || '');
+    const drawings: { base64: string; mimeType: string }[] = Array.isArray(body.drawings)
+      ? body.drawings.filter((d: { base64?: string; mimeType?: string }) => d.base64 && d.mimeType)
+      : [];
 
-    const result = await generateQS(formData, drawingBase64 || undefined, drawingMimeType || undefined, confirmedFacts);
+    // Use first drawing for backward compat with generateQS signature
+    const resolvedBase64    = drawings.length > 0 ? drawings[0].base64    : drawingBase64;
+    const resolvedMimeType  = drawings.length > 0 ? drawings[0].mimeType  : drawingMimeType;
+
+    const result = await generateQS(formData, resolvedBase64 || undefined, resolvedMimeType || undefined, confirmedFacts);
 
     if (!result.success || !result.excelBuffer) {
       res.status(500).json({ success: false, error: result.error || 'Generation failed' });

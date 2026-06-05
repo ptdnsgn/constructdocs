@@ -74,6 +74,33 @@ export async function geminiWithFile(
   });
 }
 
+// ── Text + multiple files (images or PDFs) ───────────────────────────────────
+export async function geminiWithFiles(
+  prompt: string,
+  files: { base64: string; mimeType: string; label?: string }[],
+  maxOutputTokens = 8192
+): Promise<string> {
+  return withRetry(async () => {
+    const model = genAI.getGenerativeModel({
+      model: MODEL,
+      generationConfig: { maxOutputTokens }
+    });
+
+    const parts: Part[] = [];
+
+    files.forEach((f, i) => {
+      const label = f.label || `Image ${i + 1}`;
+      parts.push({ text: `--- ${label} ---` });
+      parts.push({ inlineData: { mimeType: f.mimeType, data: f.base64 } });
+    });
+
+    parts.push({ text: prompt });
+
+    const result = await model.generateContent({ contents: [{ role: 'user', parts }] });
+    return result.response.text();
+  });
+}
+
 // ── Strip markdown code fences from Gemini response ──────────────────────────
 export function stripFences(raw: string): string {
   return raw
